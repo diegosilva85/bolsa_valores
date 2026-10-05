@@ -276,6 +276,10 @@ class MainWindow:
         ttk.Button(period_bar, text="Aplicar à aba", command=self.apply_tab_period).pack(side=LEFT)
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill=BOTH, expand=True, padx=10)
+        # Eventos dos filhos chegam ao toplevel: inclui cartões e o Canvas do gráfico.
+        # X11 usa Button-4/5; Windows e macOS usam MouseWheel.
+        for sequence in ('<Button-4>', '<Button-5>', '<MouseWheel>'):
+            root.bind(sequence, self.scroll_dashboard, add='+')
         self.footer = StringVar(value="Carregando catálogo B3…")
         Label(root, textvariable=self.footer, bg=BACKGROUND, fg=MUTED).pack(fill=X, pady=8)
         self.restore()
@@ -283,6 +287,30 @@ class MainWindow:
         root.after(80, self.poll)
         root.after(60000, self.auto_refresh)
         self.submit(self.catalog_loaded, self.catalog.refresh)
+
+    def scroll_dashboard(self, event):
+        if event.state & 0x0001:  # Shift fica reservado à rolagem horizontal.
+            return
+        widget = event.widget
+        if isinstance(widget, (ttk.Combobox, ttk.Scrollbar)):
+            return
+        selected = self.notebook.select()
+        tab = next((tab for tab in self.tabs if str(tab.frame) == selected), None)
+        if tab is None:
+            return
+        while widget is not None and widget != tab.frame:
+            widget = getattr(widget, 'master', None)
+        if widget is None or tab.canvas.yview() == (0.0, 1.0):
+            return
+        if event.num in (4, 5):
+            steps = -3 if event.num == 4 else 3
+        elif event.delta:
+            magnitude = max(1, int(abs(event.delta) / 120))
+            steps = -3 * magnitude if event.delta > 0 else 3 * magnitude
+        else:
+            return
+        tab.canvas.yview_scroll(steps, 'units')
+        return 'break'
 
     def submit(self, callback, function, *args):
         future = self.executor.submit(function, *args)
