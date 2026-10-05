@@ -282,6 +282,8 @@ class ExcelPortfolio:
         self.path = Path(path).resolve()
         self.trades = []
         self.events = []
+        self.income = []
+        self.income_periods = {}
         self.fingerprint = None
 
     def digest(self):
@@ -332,18 +334,23 @@ class ExcelPortfolio:
             positions(trades, events, normalized_events=normalized)
             by_id = {event.id: event for event in normalized}
             events = [by_id[event.id] for event in events]
+            from .income import read_income
+            income, income_periods = read_income(workbook)
         finally:
             workbook.close()
         if before != self.digest():
             raise ValueError('Arquivo alterado durante a leitura. Reabra a carteira.')
         self.trades, self.fingerprint = trades, before
         self.events = events
+        self.income, self.income_periods = income, income_periods
         return self
 
-    def write(self, trades, events=None):
+    def write(self, trades, events=None, income=None, income_periods=None):
         from openpyxl import Workbook, load_workbook
         from openpyxl.styles import Font, PatternFill
         events = list(self.events if events is None else events)
+        income = list(self.income if income is None else income)
+        income_periods = dict(self.income_periods if income_periods is None else income_periods)
         normalized = []
         positions(trades, events, normalized_events=normalized)
         by_id = {event.id: event for event in normalized}
@@ -388,6 +395,9 @@ class ExcelPortfolio:
                 event_sheet.column_dimensions[cell.column_letter].width = 24
             for row in event_sheet.iter_rows(min_row=2):
                 row[1].number_format = 'dd/mm/yyyy'
+            from .income import write_income, read_income
+            write_income(workbook, income, income_periods)
+            read_income(workbook)  # valida antes de tocar no arquivo original
             self.path.parent.mkdir(parents=True, exist_ok=True)
             descriptor, temporary = tempfile.mkstemp(suffix='.xlsx', dir=self.path.parent)
             os.close(descriptor)
@@ -399,6 +409,7 @@ class ExcelPortfolio:
             os.replace(temporary, self.path)
             self.trades, self.fingerprint = list(trades), self.digest()
             self.events = events
+            self.income, self.income_periods = income, income_periods
         finally:
             workbook.close()
             if temporary and os.path.exists(temporary):
@@ -406,3 +417,16 @@ class ExcelPortfolio:
 
     def add(self, trade):
         self.write([*self.trades, trade])
+
+    def save_income_year(self, result):
+        from .income import history_key
+        rows, period, successful = result
+        if period['history'] != history_key(self.trades, self.events):
+            raise ValueError('Histórico alterado durante a geração de proventos.')
+        if not successful and period['warnings']:
+            raise ValueError('Consulta indisponível; dados anteriores preservados. Veja Avisos da consulta e Acesso brapi.')
+        year = period['year']
+        preserved = [replace(r, review=True, note='Consulta falhou; registro anterior preservado para revisão.')
+                     for r in self.income if r.pay_day.year == year and r.ticker not in successful]
+        merged = [r for r in self.income if r.pay_day.year != year] + list(rows) + preserved
+        self.write(self.trades, income=merged, income_periods={**self.income_periods, year: period})

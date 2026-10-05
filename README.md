@@ -225,3 +225,42 @@ para EUA e [Cryptocurrency Icons](https://github.com/spothq/cryptocurrency-icons
 (CC0) para criptomoedas. A disponibilidade não é garantida para todos os ativos.
 Conversão SVG usa CairoSVG; em sistemas sem Cairo instale a biblioteca do sistema
 (`libcairo2` no Ubuntu/Debian). Falhas de logo não impedem o uso das cotações.
+# Proventos da carteira
+
+Em **Carteira → Proventos recebidos**, escolha o ano de **pagamento**. Na primeira
+abertura a carteira consulta o ano atual; selecionar outro ano ainda não salvo
+inicia sua consulta. A aba mostra os 12 meses (com rolagem), gráfico mensal e
+lançamentos detalhados de dividendos, JCP, rendimentos de FIIs e amortizações.
+
+A quantidade é reconstruída na **data com direito**, incluindo compras, vendas
+e eventos corporativos registrados. Ativos já vendidos ou convertidos também
+são consultados. O valor é uma **estimativa bruta**: não comprova crédito na
+corretora e não desconta automaticamente IR de JCP ou outras retenções.
+Pagamentos futuros ficam separados; registros não verificados, datas que são
+apenas prazos e versões conflitantes ficam em revisão, fora do total mensal.
+Eventos sem data de pagamento/data com/valor original são avisados, não
+inventados. Amortizações nesta aba não alteram o custo da posição e eventos
+manuais de liquidação não são somados novamente, evitando dupla contagem.
+
+Fonte: [brapi — proventos](https://web-next.brapi.dev/blog/api-dividendos-acoes-fiis-brasil-como-consultar-2026).
+Em **Acesso brapi**, informe um token válido ou configure `BRAPI_TOKEN` no
+ambiente antes de abrir o aplicativo. O token digitado fica somente na sessão,
+nunca no Excel, em URLs ou no Git. O acesso depende do plano contratado com
+a fonte; ações usam `includeRaw=true`/`rawRate` (documentado como recurso Pro)
+para evitar multiplicar dividendos ajustados por quantidades históricas sem
+ajuste. A consulta pública permite testar ITUB4/PETR4/VALE3/MGLU3. Não há
+contratação automática. EUA não têm cobertura por este provedor; criptos e
+moedas não são tratadas como pagadoras de dividendos. Tickers descontinuados,
+fundos não cobertos ou erros de acesso são apresentados nos avisos.
+
+As abas **Proventos** e **PeriodosProventos** do Excel guardam os lançamentos,
+origem, datas, valores, ano consultado, momento da consulta e avisos. Ao abrir
+novamente um ano salvo, não há consulta de proventos à rede (as cotações do
+painel continuam independentes). **Gerar novamente** substitui os dados daquele
+ano sem duplicar lançamentos e preserva os outros anos. Anos vazios consultados
+também são guardados. Mudanças nas compras/vendas/eventos sinalizam o cache como
+desatualizado; gere novamente para recalcular. Falha total preserva o arquivo;
+falha parcial mantém dados anteriores dos ativos com erro em revisão.
+
+Os resultados dependem de histórico completo da carteira e da cobertura da
+fonte. Confira extratos/informes antes de usar como comprovação de recebimentos.

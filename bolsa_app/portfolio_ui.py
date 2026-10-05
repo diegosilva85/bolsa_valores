@@ -171,6 +171,8 @@ class PortfolioWindow:
         notebook.add(operations, text='Operações registradas')
         from .events_ui import EventsPanel
         self.events_panel = EventsPanel(notebook, self)
+        from .income_ui import IncomePanel
+        self.income_panel = IncomePanel(notebook, self)
         self.trades_tree = table(operations, [('day','Data',100), ('ticker','Ativo',100), ('kind','Classe',100),
                                             ('side','Operação',90), ('qty','Quantidade',110), ('price','Preço unitário',130),
                                             ('value','Valor da operação',150)], height=15)
@@ -376,6 +378,7 @@ class PortfolioWindow:
 
     def render_trades(self):
         self.events_panel.render()
+        self.income_panel.refresh()
         self.trades_tree.delete(*self.trades_tree.get_children())
         for t in self.store.trades:
             self.trades_tree.insert('', 'end', iid=t.id, values=(t.day.strftime('%d/%m/%Y'), t.ticker, t.kind,
