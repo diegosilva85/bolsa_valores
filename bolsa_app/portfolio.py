@@ -1,5 +1,5 @@
 """Livro de operações em Excel e cálculo de posições, independente da interface."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
@@ -154,8 +154,10 @@ class CorporateEvent:
 
     def apply(self, result, settlements=None):
         p = result.get(self.source)
-        if p is None or p.quantity <= 0 or p.kind != self.kind:
-            raise ValueError(f'{self.source}: evento sem posição compatível na data.')
+        if p is None or p.quantity <= 0:
+            raise ValueError(f'{self.source}: evento em {self.day:%d/%m/%Y} sem saldo na data. Confira compras anteriores e o momento Antes/Depois.')
+        if p.kind != self.kind:
+            raise ValueError(f'{self.source}: classe do evento ({self.kind}) diferente da posição ({p.kind}).')
         if self.type == 'Liquidação com entrega de cotas':
             expected = p.quantity * self.factor
             remainder = expected - self.received_quantity
@@ -199,7 +201,7 @@ class CorporateEvent:
                 p.quantity = Decimal(0)
 
 
-def positions(trades, events=(), settlements=None):
+def positions(trades, events=(), settlements=None, normalized_events=None):
     result, ids = {}, set()
     signatures = set()
     for event in events:
@@ -214,7 +216,16 @@ def positions(trades, events=(), settlements=None):
             raise ValueError('ID de operação repetido na planilha.')
         ids.add(t.id)
         if isinstance(t, CorporateEvent):
+            p = result.get(t.source)
+            if p is not None and p.quantity > 0 and p.kind != t.kind:
+                # A classe das operações é a referência. Só reconcilia categorias
+                # que mantêm a mesma moeda e o mesmo instrumento de cotação.
+                if currency_for(p.kind) != currency_for(t.kind) or symbol_for(p.ticker, p.kind) != symbol_for(t.source, t.kind):
+                    raise ValueError(f'{t.source}: correção de classe altera moeda ou instrumento; revise o evento manualmente.')
+                t = replace(t, kind=p.kind, target_kind=p.kind if t.target == t.source else t.target_kind)
             t.apply(result, settlements)
+            if normalized_events is not None:
+                normalized_events.append(t)
             continue
         p = result.setdefault(t.ticker, Position(t.ticker, t.name, t.kind))
         if p.kind != t.kind:
@@ -281,7 +292,10 @@ class ExcelPortfolio:
                         events.append(CorporateEvent.make(*row[1:12], id=row[0], **extras))
                     except (ValueError, TypeError) as exc:
                         raise ValueError(f'Eventos, linha {line}: {exc}') from exc
-            positions(trades, events)
+            normalized = []
+            positions(trades, events, normalized_events=normalized)
+            by_id = {event.id: event for event in normalized}
+            events = [by_id[event.id] for event in events]
         finally:
             workbook.close()
         if before != self.digest():
@@ -294,7 +308,10 @@ class ExcelPortfolio:
         from openpyxl import Workbook, load_workbook
         from openpyxl.styles import Font, PatternFill
         events = list(self.events if events is None else events)
-        positions(trades, events)
+        normalized = []
+        positions(trades, events, normalized_events=normalized)
+        by_id = {event.id: event for event in normalized}
+        events = [by_id[event.id] for event in events]
         if self.digest() != self.fingerprint:
             raise ValueError('O Excel foi alterado fora do app. Recarregue antes de salvar.')
         workbook = load_workbook(self.path) if self.path.exists() else Workbook()

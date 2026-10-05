@@ -73,6 +73,12 @@ class EventsPanel:
             widget = ttk.Combobox(dialog, textvariable=fields[key], values=choices, state='readonly') if choices else ttk.Entry(dialog, textvariable=fields[key])
             widget.grid(row=row, column=1, padx=10, sticky='ew')
         fields['kind'].trace_add('write', lambda *_: fields['target_kind'].set(fields['kind'].get()))
+        def source_class(*_):
+            ticker = fields['source'].get().strip().upper().removesuffix('.SA')
+            holding = self.owner.holdings.get(ticker)
+            if holding is not None:
+                fields['kind'].set(holding.kind)
+        fields['source'].trace_add('write', source_class)
         help_text = ('Split 1→10: fator 10; grupamento 10→1: 0,1. Incorporação/cisão: unidades recebidas por unidade antiga. '
                      'Bonificação de 10%: fator 0,1 e custo informado por nova unidade. Amortização: redução de custo por unidade existente. '
                      'Troca de nome: repita o ticker. Destino vazio mantém a origem. Valores na moeda do ativo. '

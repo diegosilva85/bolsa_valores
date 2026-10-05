@@ -6,6 +6,32 @@ from bolsa_app.portfolio import CorporateEvent, ExcelPortfolio, Trade, positions
 
 
 class EventsTests(unittest.TestCase):
+    def test_excel_class_correction_reconciles_events(self):
+        from openpyxl import load_workbook
+        for ticker in ('BCFF11', 'BBPO11'):
+            with self.subTest(ticker=ticker), tempfile.TemporaryDirectory() as folder:
+                trade = Trade.make('01/01/2018', ticker, '', 'Ações', 'Compra', 10, 80)
+                event = CorporateEvent.make('29/11/2023', 'Desdobramento', ticker, 'Ações', factor=8)
+                store = ExcelPortfolio(Path(folder) / 'test.xlsx')
+                store.write([trade], [event])
+                workbook = load_workbook(store.path)
+                workbook['Operações']['E2'] = 'FIIs'
+                workbook.save(store.path)
+                workbook.close()
+                before = store.path.read_bytes()
+                loaded = ExcelPortfolio(store.path).load()
+                self.assertEqual(store.path.read_bytes(), before)
+                self.assertEqual((loaded.events[0].kind, loaded.events[0].target_kind), ('FIIs', 'FIIs'))
+                p = positions(loaded.trades, loaded.events)[ticker]
+                self.assertEqual((p.kind, p.quantity, p.cost), ('FIIs', 80, 800))
+                loaded.write(loaded.trades)
+                self.assertEqual(ExcelPortfolio(store.path).load().events[0].kind, 'FIIs')
+
+    def test_class_correction_does_not_hide_missing_position(self):
+        trade = Trade.make('03/01/2020', 'ABCD3', '', 'FIIs', 'Compra', 10, 20)
+        with self.assertRaisesRegex(ValueError, 'sem saldo na data'):
+            positions([trade], [self.event('Desdobramento', factor=8)])
+
     def test_liquidation_distinct_cost_cash_fraction_and_sale(self):
         event = self.event('Liquidação com entrega de cotas', target='EFGH3', factor='.83',
                            received_quantity=8, received_price=12, cash='5.61')

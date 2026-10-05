@@ -146,6 +146,14 @@ mais recente disponível, identificada pela data do último dado, em horário de
 5. Criar alertas de preço e acompanhamento de rentabilidade.
 # Eventos corporativos manuais
 
+Ao corrigir a classe de um ativo na aba Operações do Excel, corrija todos os
+lançamentos desse ticker e use **Recarregar Excel** no app. A classe de origem
+dos eventos acompanha a posição recalculada quando moeda e instrumento não
+mudam (por exemplo, Ações → FIIs). Para eventos no mesmo ticker, a classe de
+destino também acompanha a correção; destinos com outro ticker mantêm sua
+classe explícita. A leitura não sobrescreve o arquivo: a reconciliação é gravada
+na próxima gravação pelo app. Ausência de saldo na data continua sendo um erro.
+
 **Liquidação com entrega de cotas:** para eventos que encerram o ativo antigo
 e entregam outro ativo mais dinheiro, selecione esse tipo em vez de Incorporação.
 Informe a relação de troca, a quantidade efetivamente creditada, o custo unitário
