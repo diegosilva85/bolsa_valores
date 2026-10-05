@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.bolsa_data/
+*.xlsx
+*.xls
+.env
+.env.*
+!.env.example
+core
+core.*
