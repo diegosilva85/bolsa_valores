@@ -146,6 +146,20 @@ mais recente disponível, identificada pela data do último dado, em horário de
 5. Criar alertas de preço e acompanhamento de rentabilidade.
 # Eventos corporativos manuais
 
+**Liquidação com entrega de cotas:** para eventos que encerram o ativo antigo
+e entregam outro ativo mais dinheiro, selecione esse tipo em vez de Incorporação.
+Informe a relação de troca, a quantidade efetivamente creditada, o custo unitário
+das novas cotas conforme o informe e o dinheiro líquido **total** recebido.
+O custo antigo é encerrado e preservado no histórico; não é transferido ao destino.
+Se já houver posição no destino, o novo custo é somado ao existente.
+O dinheiro é um registro histórico, não um saldo de caixa e não integra o total
+de ativos da carteira. Use a data efetiva do evento; este registro não controla
+datas separadas de pagamentos. A diferença entre quantidade teórica e creditada
+deve ser menor que uma unidade: fica discriminada para conferência, sem cotação,
+sem venda automática e sem apuração de imposto. Eventuais recebimentos posteriores
+exigem substituir o evento com os valores consolidados; não há conciliação de caixa.
+Os valores são manuais: não há preenchimento automático de BCFF11/BTHF11.
+
 Na carteira, abra **Eventos e custo ajustado → Registrar evento corporativo**.
 Há suporte a desdobramento, grupamento, troca de ticker/nome, incorporação,
 cisão, bonificação e amortização, sem importação da B3. Confira os dados no
@@ -158,7 +172,8 @@ grupamento 10→1: `0,1`). Na bonificação, informe somente a proporção adici
 custo transferido ao destino; a quantidade da origem permanece inalterada.
 Incorporações transferem todo o custo e encerram a posição de origem.
 Amortização reduz o custo pelo valor informado por unidade, sem registrar caixa.
-Compensações em dinheiro, eventos com redução simultânea da quantidade na cisão
+Compensações em dinheiro não são calculadas automaticamente (na liquidação,
+podem ser informadas). Eventos com redução simultânea da quantidade na cisão
 e apuração tributária não são calculados automaticamente.
 
 As operações originais são preservadas; os eventos ficam na aba `Eventos` do

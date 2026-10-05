@@ -6,6 +6,46 @@ from bolsa_app.portfolio import CorporateEvent, ExcelPortfolio, Trade, positions
 
 
 class EventsTests(unittest.TestCase):
+    def test_liquidation_distinct_cost_cash_fraction_and_sale(self):
+        event = self.event('Liquidação com entrega de cotas', target='EFGH3', factor='.83',
+                           received_quantity=8, received_price=12, cash='5.61')
+        ledger = []
+        existing = Trade.make('01/01/2020', 'EFGH3', '', 'Ações', 'Compra', 2, 10)
+        sell = Trade.make('03/01/2020', 'EFGH3', '', 'Ações', 'Venda', 5, 15)
+        result = positions([self.buy(), existing, sell], [event], ledger)
+        self.assertNotIn('ABCD3', result)
+        self.assertEqual((result['EFGH3'].quantity, result['EFGH3'].cost), (5, 58))
+        self.assertEqual(ledger[0]['fraction'], Decimal('.3'))
+        self.assertEqual(ledger[0]['cash'], Decimal('5.61'))
+        self.assertEqual(ledger[0]['old_cost'], 200)
+        with tempfile.TemporaryDirectory() as folder:
+            store = ExcelPortfolio(Path(folder) / 'liquidation.xlsx')
+            store.write([self.buy()], [event])
+            self.assertEqual(ExcelPortfolio(store.path).load().events, [event])
+
+    def test_liquidation_validation(self):
+        with self.assertRaises(ValueError):
+            self.event('Liquidação com entrega de cotas', target='EFGH3')
+        for qty in (7, 9):
+            event = self.event('Liquidação com entrega de cotas', target='EFGH3', factor='.83', received_quantity=qty, received_price=12)
+            with self.assertRaises(ValueError):
+                positions([self.buy()], [event])
+
+    def test_legacy_event_sheet(self):
+        from openpyxl import load_workbook
+        with tempfile.TemporaryDirectory() as folder:
+            store = ExcelPortfolio(Path(folder) / 'legacy.xlsx')
+            event = self.event('Desdobramento', factor=8)
+            store.write([self.buy()], [event])
+            workbook = load_workbook(store.path)
+            workbook['Eventos'].delete_cols(13, 3)
+            workbook.save(store.path)
+            workbook.close()
+            loaded = ExcelPortfolio(store.path).load()
+            self.assertEqual(loaded.events, [event])
+            loaded.write(loaded.trades)
+            self.assertEqual(ExcelPortfolio(store.path).load().events, [event])
+
     def buy(self):
         return Trade.make('01/01/2020', 'ABCD3', 'Original', 'Ações', 'Compra', 10, 20)
 

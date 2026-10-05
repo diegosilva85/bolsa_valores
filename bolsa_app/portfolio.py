@@ -104,8 +104,9 @@ class Position:
     cost: Decimal = Decimal(0)
 
 
-EVENT_TYPES = ('Desdobramento', 'Grupamento', 'Troca de ticker/nome', 'Incorporação', 'Cisão', 'Bonificação', 'Amortização')
-EVENT_HEADERS = ('ID', 'Data', 'Tipo', 'Origem', 'Classe origem', 'Destino', 'Nome destino', 'Classe destino', 'Fator', 'Percentual de custo', 'Valor', 'Momento')
+EVENT_TYPES = ('Desdobramento', 'Grupamento', 'Troca de ticker/nome', 'Incorporação', 'Cisão', 'Bonificação', 'Amortização', 'Liquidação com entrega de cotas')
+LEGACY_EVENT_HEADERS = ('ID', 'Data', 'Tipo', 'Origem', 'Classe origem', 'Destino', 'Nome destino', 'Classe destino', 'Fator', 'Percentual de custo', 'Valor', 'Momento')
+EVENT_HEADERS = (*LEGACY_EVENT_HEADERS, 'Quantidade creditada', 'Custo unitário recebido', 'Dinheiro líquido total')
 
 
 @dataclass(frozen=True)
@@ -122,9 +123,12 @@ class CorporateEvent:
     cost_percent: Decimal
     amount: Decimal
     timing: str
+    received_quantity: Decimal = Decimal(0)
+    received_price: Decimal = Decimal(0)
+    cash: Decimal = Decimal(0)
 
     @classmethod
-    def make(cls, day, type, source, kind, target='', name='', target_kind='', factor='1', cost_percent='0', amount='0', timing='Antes', id=None):
+    def make(cls, day, type, source, kind, target='', name='', target_kind='', factor='1', cost_percent='0', amount='0', timing='Antes', id=None, received_quantity='0', received_price='0', cash='0'):
         if type not in EVENT_TYPES or timing not in ('Antes', 'Depois'):
             raise ValueError('Tipo ou momento do evento inválido.')
         origin = Trade.make(day, source, source, kind, 'Compra', 1, 1)
@@ -138,15 +142,37 @@ class CorporateEvent:
             raise ValueError('Percentual deve estar entre 0 e 100; moedas devem coincidir.')
         if type == 'Desdobramento' and f <= 1 or type == 'Grupamento' and f >= 1:
             raise ValueError('Desdobramento exige fator > 1; grupamento exige fator < 1.')
-        if type in ('Incorporação', 'Cisão') and origin.ticker == destination.ticker:
+        if type in ('Incorporação', 'Cisão', 'Liquidação com entrega de cotas') and origin.ticker == destination.ticker:
             raise ValueError('Informe um ticker de destino diferente.')
-        return cls(str(id or uuid4()), origin.day, type, origin.ticker, kind, destination.ticker, destination.name, destination.kind, f, pct, value, timing)
+        qty, price, cash_value = map(nonnegative, (received_quantity, received_price, cash))
+        if type == 'Liquidação com entrega de cotas':
+            if price <= 0:
+                raise ValueError('Informe o custo unitário das cotas recebidas conforme o informe, não a cotação atual.')
+        elif qty or price or cash_value:
+            raise ValueError('Quantidade creditada, custo recebido e dinheiro são exclusivos da liquidação.')
+        return cls(str(id or uuid4()), origin.day, type, origin.ticker, kind, destination.ticker, destination.name, destination.kind, f, pct, value, timing, qty, price, cash_value)
 
-    def apply(self, result):
+    def apply(self, result, settlements=None):
         p = result.get(self.source)
         if p is None or p.quantity <= 0 or p.kind != self.kind:
             raise ValueError(f'{self.source}: evento sem posição compatível na data.')
-        if self.type in ('Desdobramento', 'Grupamento'):
+        if self.type == 'Liquidação com entrega de cotas':
+            expected = p.quantity * self.factor
+            remainder = expected - self.received_quantity
+            if remainder < 0 or remainder >= 1:
+                raise ValueError('Quantidade creditada incompatível com a relação de troca: diferença deve ser uma fração menor que 1.')
+            q = result.setdefault(self.target, Position(self.target, self.name, self.target_kind))
+            if q.kind != self.target_kind:
+                raise ValueError('Classe do destino incompatível.')
+            if settlements is not None:
+                settlements.append({'id': self.id, 'source': self.source, 'target': self.target,
+                                    'old_cost': p.cost, 'received_cost': self.received_quantity * self.received_price,
+                                    'fraction': remainder, 'cash': self.cash, 'currency': currency_for(self.kind)})
+            q.quantity += self.received_quantity
+            q.cost += self.received_quantity * self.received_price
+            q.name = self.name
+            p.quantity = p.cost = Decimal(0)
+        elif self.type in ('Desdobramento', 'Grupamento'):
             p.quantity *= self.factor
         elif self.type == 'Bonificação':
             extra = p.quantity * self.factor
@@ -173,7 +199,7 @@ class CorporateEvent:
                 p.quantity = Decimal(0)
 
 
-def positions(trades, events=()):
+def positions(trades, events=(), settlements=None):
     result, ids = {}, set()
     signatures = set()
     for event in events:
@@ -188,7 +214,7 @@ def positions(trades, events=()):
             raise ValueError('ID de operação repetido na planilha.')
         ids.add(t.id)
         if isinstance(t, CorporateEvent):
-            t.apply(result)
+            t.apply(result, settlements)
             continue
         p = result.setdefault(t.ticker, Position(t.ticker, t.name, t.kind))
         if p.kind != t.kind:
@@ -242,7 +268,8 @@ class ExcelPortfolio:
             events = []
             if 'Eventos' in workbook.sheetnames:
                 rows = workbook['Eventos'].iter_rows(values_only=True)
-                if tuple(next(rows, ())) != EVENT_HEADERS:
+                event_header = tuple(next(rows, ()))
+                if event_header not in (EVENT_HEADERS, LEGACY_EVENT_HEADERS):
                     raise ValueError('Colunas da aba Eventos incompatíveis.')
                 for line, row in enumerate(rows, 2):
                     if all(v is None for v in row):
@@ -250,7 +277,8 @@ class ExcelPortfolio:
                     try:
                         if not row[0]:
                             raise ValueError('ID ausente.')
-                        events.append(CorporateEvent.make(*row[1:], id=row[0]))
+                        extras = dict(zip(('received_quantity', 'received_price', 'cash'), row[12:]))
+                        events.append(CorporateEvent.make(*row[1:12], id=row[0], **extras))
                     except (ValueError, TypeError) as exc:
                         raise ValueError(f'Eventos, linha {line}: {exc}') from exc
             positions(trades, events)
@@ -300,7 +328,7 @@ class ExcelPortfolio:
             for event in events:
                 event_sheet.append([str(v) if isinstance(v, Decimal) else v for v in vars(event).values()])
             event_sheet.freeze_panes = 'A2'
-            event_sheet.auto_filter.ref = f'A1:L{event_sheet.max_row}'
+            event_sheet.auto_filter.ref = f'A1:O{event_sheet.max_row}'
             for cell in event_sheet[1]:
                 cell.font = Font(color='FFFFFF', bold=True)
                 cell.fill = PatternFill('solid', fgColor='15324F')
