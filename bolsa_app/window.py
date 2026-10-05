@@ -91,7 +91,7 @@ class MarketChart(Canvas):
 
 
 class QuoteCard(Frame):
-    def __init__(self, parent, app, asset, period="Hoje", removable=False):
+    def __init__(self, parent, app, asset, period="Hoje", removable=False, refresh=True):
         super().__init__(parent, background=CARD, padx=10, pady=8)
         self.app, self.asset = app, asset
         self.alive, self.loading = True, False
@@ -101,6 +101,10 @@ class QuoteCard(Frame):
         self.fx = None
         head = Frame(self, background=CARD)
         head.pack(fill=X)
+        if removable:
+            self.drag_handle = Label(head, text='⋮⋮', bg=CARD, fg=BLUE, cursor='fleur', font=('Sans', 14))
+            self.drag_handle.pack(side=LEFT, padx=(0, 5))
+            self.drag_handle.bind('<ButtonPress-1>', lambda event: app.start_drag(self, event))
         Label(head, text=asset.ticker.replace(".SA", ""), bg=CARD, fg=TEXT,
               font=("Sans", 12, "bold")).pack(side=LEFT)
         if removable:
@@ -125,13 +129,15 @@ class QuoteCard(Frame):
         selector.pack(side=LEFT)
         selector.bind("<<ComboboxSelected>>", self.period_changed)
         ttk.Button(controls, text="↻", width=3, command=self.refresh).pack(side=RIGHT)
+        ttk.Button(controls, text='Informações', command=lambda: app.show_info(asset)).pack(side=RIGHT, padx=3)
         self.chart = MarketChart(self)
         self.chart.configure(width=200, height=150)
         self.chart.pack(fill=BOTH, expand=True)
         self.status = Label(self, text="Aguardando atualização", bg=CARD, fg=MUTED,
                             anchor="w", wraplength=290)
         self.status.pack(fill=X)
-        self.refresh()
+        if refresh:
+            self.refresh()
 
     def period_changed(self, _event=None, save=True):
         self.snapshot = None
@@ -250,6 +256,9 @@ class MainWindow:
     def __init__(self, root: Tk):
         self.root = root
         self.provider = YahooFinanceProvider()
+        from .indicators import IndicatorsProvider
+        self.indicators = IndicatorsProvider()
+        self.dragging = None
         self.catalog = Catalog()
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.results = queue.Queue()
@@ -278,8 +287,12 @@ class MainWindow:
         ttk.Combobox(period_bar, textvariable=self.tab_period, values=list(HISTORY_RANGES),
                      state="readonly", width=20).pack(side=LEFT, padx=8)
         ttk.Button(period_bar, text="Aplicar à aba", command=self.apply_tab_period).pack(side=LEFT)
+        ttk.Button(period_bar, text='+ Nova aba', command=self.new_tab).pack(side=RIGHT)
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill=BOTH, expand=True, padx=10)
+        root.bind('<B1-Motion>', self.drag_motion, add='+')
+        root.bind('<ButtonRelease-1>', self.end_drag, add='+')
+        root.bind('<Escape>', self.cancel_drag, add='+')
         # Eventos dos filhos chegam ao toplevel: inclui cartões e o Canvas do gráfico.
         # X11 usa Button-4/5; Windows e macOS usam MouseWheel.
         for sequence in ('<Button-4>', '<Button-5>', '<MouseWheel>'):
@@ -291,6 +304,114 @@ class MainWindow:
         root.after(80, self.poll)
         root.after(60000, self.auto_refresh)
         self.submit(self.catalog_loaded, self.catalog.refresh)
+
+    def show_info(self, asset):
+        from .indicators import open_indicators
+        open_indicators(self, asset)
+
+    def new_tab(self):
+        if len(self.tabs) >= 4:
+            messagebox.showinfo('Limite de abas', 'O painel permite até 4 abas.', parent=self.root)
+            return
+        tab = DashboardTab(self.notebook)
+        self.tabs.append(tab)
+        self.notebook.add(tab.frame, text=f'Aba {len(self.tabs)}')
+        self.notebook.select(tab.frame)
+        tab.layout()
+        self.update_titles()
+        self.save()
+
+    def start_drag(self, card, event):
+        self.dragging = (card, event.x_root, event.y_root)
+        self.drag_active = False
+
+    def drop_target(self, x, y):
+        nx, ny = x - self.notebook.winfo_rootx(), y - self.notebook.winfo_rooty()
+        try:
+            index = self.notebook.index(f'@{nx},{ny}')
+            return self.tabs[index], None
+        except Exception:
+            pass
+        for tab in self.tabs:
+            if str(tab.frame) != self.notebook.select():
+                continue
+            cx, cy = x - tab.canvas.winfo_rootx(), y - tab.canvas.winfo_rooty()
+            if 0 <= cx < tab.canvas.winfo_width() and 0 <= cy < tab.canvas.winfo_height():
+                columns = max(1, min(3, len(tab.cards)))
+                column = min(columns - 1, int(cx / max(1, tab.canvas.winfo_width() / columns)))
+                rows = max(1, math.ceil(len(tab.cards) / columns))
+                row = int(tab.canvas.canvasy(cy) / max(1, tab.body.winfo_height() / rows))
+                return tab, min(row * columns + column, len(tab.cards))
+        return None, None
+
+    def drag_motion(self, event):
+        if not self.dragging:
+            return
+        card, x, y = self.dragging
+        if abs(event.x_root - x) + abs(event.y_root - y) < 6 and not self.drag_active:
+            return
+        self.drag_active = True
+        self.root.grab_set()
+        target, index = self.drop_target(event.x_root, event.y_root)
+        if target:
+            self.notebook.select(target.frame)
+            full = card not in target.cards and len(target.cards) >= 12
+            self.footer.set('Aba cheia (12 gráficos).' if full else f"Solte para mover {card.asset.ticker} à aba {self.tabs.index(target)+1}" + (f', posição {index+1}' if index is not None else '') + ' • Esc cancela')
+            if index is not None:
+                cy = event.y_root - target.canvas.winfo_rooty()
+                if cy < 25:
+                    target.canvas.yview_scroll(-1, 'units')
+                elif cy > target.canvas.winfo_height() - 25:
+                    target.canvas.yview_scroll(1, 'units')
+        else:
+            self.footer.set('Solte sobre um cartão ou outra aba • Esc cancela')
+
+    def cancel_drag(self, event=None):
+        if self.dragging:
+            self.dragging = None
+            self.root.grab_release()
+            self.footer.set('Arraste pela alça ⋮⋮ para reorganizar os gráficos.')
+
+    def end_drag(self, event):
+        if not self.dragging:
+            return
+        card = self.dragging[0]
+        target, index = self.drop_target(event.x_root, event.y_root)
+        active = self.drag_active
+        self.cancel_drag()
+        if active and target:
+            self.move_card(card, target, index)
+
+    def move_card(self, card, target, index=None):
+        source = next((tab for tab in self.tabs if card in tab.cards), None)
+        if source is None or target not in self.tabs:
+            return False
+        if source != target and len(target.cards) >= 12:
+            messagebox.showinfo('Aba cheia', 'A aba de destino já tem 12 gráficos.', parent=self.root)
+            return False
+        if source != target:
+            # Tk não permite trocar o pai de um widget: recria só a apresentação.
+            moved = QuoteCard(target.body, self, card.asset, card.period.get(), removable=True, refresh=False)
+            moved.snapshot, moved.fx = card.snapshot, card.fx
+            moved.display_currency = card.display_currency
+            if card.asset.currency == 'USD':
+                moved.currency_button.config(text='Ver em US$' if moved.display_currency == 'BRL' else 'Ver em R$')
+            if moved.snapshot:
+                moved.draw_snapshot()
+            else:
+                moved.refresh()
+            source.cards.remove(card)
+            card.dispose()
+        else:
+            moved = card
+            source.cards.remove(card)
+        target.cards.insert(len(target.cards) if index is None else max(0, min(index, len(target.cards))), moved)
+        source.layout()
+        target.layout()
+        self.notebook.select(target.frame)
+        self.update_titles()
+        self.save()
+        return True
 
     def scroll_dashboard(self, event):
         if event.state & 0x0001:  # Shift fica reservado à rolagem horizontal.

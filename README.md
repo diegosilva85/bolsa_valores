@@ -27,6 +27,32 @@ para a aba existente. Cada gráfico possui seu próprio período.
 Na faixa superior, escolha um período e clique em **Aplicar à aba** para atualizar
 todos os gráficos da aba selecionada; as demais abas mantêm seus períodos.
 
+### Reorganizar gráficos
+
+Arraste pela alça **⋮⋮** no cabeçalho do cartão e solte sobre outra posição.
+Para mudar de aba, passe sobre o título da aba de destino e solte ali (acrescenta
+ao final), ou continue até a posição desejada no painel. Use **+ Nova aba** para
+criar uma aba vazia; continuam valendo os limites de quatro abas e 12 gráficos
+por aba. Abas cheias recusam a transferência. Soltar fora do painel ou pressionar
+Esc cancela. A nova ordem é salva automaticamente e o período do cartão é mantido.
+
+### Informações e indicadores
+
+O botão **Informações** em cada gráfico abre indicadores agrupados em Valuation,
+Endividamento, Eficiência e Rentabilidade: P/L, P/VP, DY de 12 meses, LPA, VPA,
+EV/EBITDA, P/Receita, dívida líquida/EBITDA, dívida/patrimônio, liquidez,
+margens, ROE e ROA. Cada linha identifica sua definição/metodologia.
+Na carteira, clique em um ativo da composição geral ou do detalhamento de uma
+classe e escolha **Informações e indicadores**. Enter também abre a seleção.
+
+A organização usa o [Status Invest](https://statusinvest.com.br/acoes/petr4) como
+referência. Os dados são do Yahoo Finance, com horário de consulta, trimestre
+reportado e cache de cinco minutos; metodologias e períodos podem diferir entre
+provedores. Campos ausentes aparecem como **—**, nunca como zero. Dívida líquida
+é calculada como dívida total menos caixa, sem ajustes adicionais. Fundos recebem
+apenas indicadores compatíveis disponíveis. Indicadores empresariais não se aplicam
+a moedas, criptomoedas ou índices.
+
 ## Câmbio
 
 A busca inclui 20 moedas contra o real: USD, EUR, JPY, CNY, GBP, CHF, CAD,

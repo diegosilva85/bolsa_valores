@@ -166,6 +166,7 @@ class PortfolioWindow:
         self.assets = table(summary, [('ticker','Ativo / cor',110), ('kind','Classe',100), ('qty','Quantidade',100),
                                       ('price','Cotação',120), ('value','Valor atual',140),
                                       ('pct','% da carteira',110), ('stamp','Data da cotação',180)], height=7)
+        self.bind_asset_info(self.assets)
         operations = Frame(notebook, bg=BG)
         notebook.add(operations, text='Operações registradas')
         self.trades_tree = table(operations, [('day','Data',100), ('ticker','Ativo',100), ('kind','Classe',100),
@@ -299,9 +300,33 @@ class PortfolioWindow:
             quote_currency = currency_for(p.kind) if self.native_prices else 'BRL'
             quote = self.convert(quote, currency_for(p.kind), quote_currency)
             tree.tag_configure(ticker, foreground=color(ticker))
-            tree.insert('', 'end', values=('● '+ticker, p.kind, str(p.quantity), money(quote, quote_currency), money(values[ticker], self.display_currency),
+            tree.insert('', 'end', iid=ticker, values=('● '+ticker, p.kind, str(p.quantity), money(quote, quote_currency), money(values[ticker], self.display_currency),
                                          percent(values[ticker], total), stamp.strftime('%d/%m/%Y %H:%M') if stamp else 'Sem cotação'),
                         tags=(ticker,))
+
+    def bind_asset_info(self, tree):
+        from tkinter import Menu
+        menu = Menu(tree, tearoff=False)
+        def info():
+            selected = tree.selection()
+            if not selected or selected[0] not in self.holdings:
+                return
+            from .catalog import Asset
+            p = self.holdings[selected[0]]
+            kind = next((k for k, value in CLASS_MAP.items() if value == p.kind), 'stock')
+            self.app.show_info(Asset(p.ticker, p.name, kind))
+        menu.add_command(label='Informações e indicadores', command=info)
+        def clicked(event):
+            item = tree.identify_row(event.y)
+            if item:
+                tree.selection_set(item)
+                try:
+                    menu.tk_popup(event.x_root, event.y_root)
+                finally:
+                    menu.grab_release()
+        tree.bind('<ButtonRelease-1>', clicked)
+        tree.bind('<Button-3>', clicked)
+        tree.bind('<Return>', lambda _: info())
 
     def class_selected(self, _event=None):
         selection = self.classes.selection()
@@ -327,6 +352,7 @@ class PortfolioWindow:
         tree = table(dialog, [('ticker','Ativo / cor',110), ('kind','Classe',100), ('qty','Quantidade',100),
                               ('price','Cotação',120), ('value','Valor atual',140), ('pct','% da classe',110),
                               ('stamp','Data da cotação',180)])
+        self.bind_asset_info(tree)
         entry = (dialog, kind, title, pie, tree)
         self.details.append(entry)
         self.render_detail(entry)
