@@ -144,3 +144,28 @@ mais recente disponível, identificada pela data do último dado, em horário de
 3. Exportar e importar a configuração do painel.
 4. Adicionar candles e volume.
 5. Criar alertas de preço e acompanhamento de rentabilidade.
+# Eventos corporativos manuais
+
+Na carteira, abra **Eventos e custo ajustado → Registrar evento corporativo**.
+Há suporte a desdobramento, grupamento, troca de ticker/nome, incorporação,
+cisão, bonificação e amortização, sem importação da B3. Confira os dados no
+comunicado do evento: o aplicativo não descobre nem valida relações de troca
+ou critérios fiscais automaticamente.
+
+O fator é a quantidade recebida por unidade antiga (split 1→10: `10`;
+grupamento 10→1: `0,1`). Na bonificação, informe somente a proporção adicional
+(10%: `0,1`) e o custo por nova unidade. Na cisão, informe o percentual do
+custo transferido ao destino; a quantidade da origem permanece inalterada.
+Incorporações transferem todo o custo e encerram a posição de origem.
+Amortização reduz o custo pelo valor informado por unidade, sem registrar caixa.
+Compensações em dinheiro, eventos com redução simultânea da quantidade na cisão
+e apuração tributária não são calculados automaticamente.
+
+As operações originais são preservadas; os eventos ficam na aba `Eventos` do
+Excel. A carteira é recalculada por data; escolha Antes/Depois das operações
+do mesmo dia. Eventos no mesmo dia/momento seguem a ordem de registro.
+Frações são mantidas, sem venda ou arredondamento automático. Subscrições
+exercidas devem ser lançadas como compras. Transferências entre corretoras não
+alteram esta carteira consolidada e não devem ser lançadas como compras/vendas.
+Arquivos antigos continuam aceitos. Exclusões também revalidam todo o histórico;
+a versão anterior do arquivo fica em `.backup.xlsx`.

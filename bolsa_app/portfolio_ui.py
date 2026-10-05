@@ -124,7 +124,7 @@ class PortfolioWindow:
         self.window.configure(bg=BG)
         self.alive, self.version = True, 0
         self.quotes, self.errors, self.details = {}, {}, []
-        self.holdings = positions(store.trades)
+        self.holdings = positions(store.trades, store.events)
         self.fx = None
         self.display_currency = 'BRL'
         self.native_prices = True
@@ -169,6 +169,8 @@ class PortfolioWindow:
         self.bind_asset_info(self.assets)
         operations = Frame(notebook, bg=BG)
         notebook.add(operations, text='Operações registradas')
+        from .events_ui import EventsPanel
+        self.events_panel = EventsPanel(notebook, self)
         self.trades_tree = table(operations, [('day','Data',100), ('ticker','Ativo',100), ('kind','Classe',100),
                                             ('side','Operação',90), ('qty','Quantidade',110), ('price','Preço unitário',130),
                                             ('value','Valor da operação',150)], height=15)
@@ -188,7 +190,7 @@ class PortfolioWindow:
     def reload(self):
         try:
             self.store.load()
-            self.holdings = positions(self.store.trades)
+            self.holdings = positions(self.store.trades, self.store.events)
             self.render_trades()
             self.refresh()
         except Exception as exc:
@@ -368,6 +370,7 @@ class PortfolioWindow:
         self.fill_assets(tree, subset, total)
 
     def render_trades(self):
+        self.events_panel.render()
         self.trades_tree.delete(*self.trades_tree.get_children())
         for t in self.store.trades:
             self.trades_tree.insert('', 'end', iid=t.id, values=(t.day.strftime('%d/%m/%Y'), t.ticker, t.kind,
@@ -381,7 +384,7 @@ class PortfolioWindow:
             return
         try:
             self.store.write([t for t in self.store.trades if t.id != selected[0]])
-            self.holdings = positions(self.store.trades)
+            self.holdings = positions(self.store.trades, self.store.events)
             self.render_trades()
             self.refresh()
         except Exception as exc:
@@ -430,7 +433,7 @@ class PortfolioWindow:
                                fields['Classe'].get(), fields['Operação'].get(), fields['Quantidade'].get(),
                                fields['Preço unitário'].get())
                 self.store.add(t)
-                self.holdings = positions(self.store.trades)
+                self.holdings = positions(self.store.trades, self.store.events)
                 self.render_trades()
                 self.refresh()
                 dialog.destroy()
