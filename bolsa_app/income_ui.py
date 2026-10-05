@@ -5,6 +5,7 @@ from threading import Event
 from tkinter import Canvas, Frame, Label, StringVar, messagebox, simpledialog, ttk
 from .design import BG, SURFACE, FG, MUTED, ACCENT
 from .income import BrapiIncomeProvider, TYPES, generate_income, history_key, monthly_totals
+from .official_income import OfficialIncomeProvider
 
 MONTHS = ('Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto',
           'Setembro', 'Outubro', 'Novembro', 'Dezembro')
@@ -28,6 +29,10 @@ class IncomePanel:
         self.selector.bind('<<ComboboxSelected>>', lambda _: self.load_year())
         self.regenerate = ttk.Button(bar, text='↻ Gerar novamente', command=lambda: self.load_year(force=True))
         self.regenerate.pack(side='left')
+        self.source = StringVar(value='Gratuita — Itaú (ITUB3/4)')
+        self.source_selector = ttk.Combobox(bar, textvariable=self.source, state='readonly', width=27,
+            values=('Gratuita — Itaú (ITUB3/4)', 'brapi (opcional)'))
+        self.source_selector.pack(side='left', padx=8)
         ttk.Button(bar, text='Acesso brapi', command=self.configure).pack(side='right')
         ttk.Button(bar, text='Avisos da consulta', command=self.show_warnings).pack(side='right', padx=6)
         self.status = StringVar(value='Selecione um ano para consultar.')
@@ -49,7 +54,8 @@ class IncomePanel:
             ('fii', 'Rendimentos FII', 140), ('amort', 'Amortizações', 130), ('other', 'Outros', 110), ('total', 'Total bruto', 140)], height=6)
         self.details = table(detail, [('pay', 'Pagamento', 100), ('ticker', 'Ativo', 100), ('type', 'Tipo', 130),
             ('record', 'Data com', 100), ('qty', 'Quantidade', 100), ('unit', 'Por unidade', 115),
-            ('gross', 'Bruto', 115), ('state', 'Situação', 145), ('note', 'Observação', 400)], height=8)
+            ('gross', 'Bruto', 115), ('state', 'Situação', 145), ('note', 'Observação', 400),
+            ('source', 'Fonte', 350)], height=8)
         self.last_warnings = ''
         self.refresh()
         initial_job = self.frame.after(200, self.load_year)
@@ -95,16 +101,19 @@ class IncomePanel:
         self.busy = True
         self.regenerate.state(['disabled'])
         self.selector.state(['disabled'])
+        self.source_selector.state(['disabled'])
         self.status.set(f'Consultando proventos de {year} e reconstruindo posições nas datas de direito…')
         trades, events = list(store.trades), list(store.events)
         key, fingerprint = history_key(trades, events), store.fingerprint
-        provider = BrapiIncomeProvider(self.provider.token)
+        provider = (OfficialIncomeProvider() if self.source.get().startswith('Gratuita')
+                    else BrapiIncomeProvider(self.provider.token))
         def loaded(result, error):
             if not self.owner.alive:
                 return
             self.busy = False
             self.regenerate.state(['!disabled'])
             self.selector.state(['!disabled', 'readonly'])
+            self.source_selector.state(['!disabled', 'readonly'])
             try:
                 if error:
                     raise ValueError(str(error))
@@ -132,7 +141,7 @@ class IncomePanel:
         for r in sorted(rows, key=lambda r: (r.pay_day, r.ticker, r.type)):
             state = 'Revisar' if r.review else 'Previsto' if r.pay_day > date.today() else 'Pago (estimado)'
             self.details.insert('', 'end', values=(r.pay_day.strftime('%d/%m/%Y'), r.ticker, r.type,
-                r.record_day.strftime('%d/%m/%Y'), str(r.quantity), money(r.unit, r.currency), money(r.gross, r.currency), state, r.note))
+                r.record_day.strftime('%d/%m/%Y'), str(r.quantity), money(r.unit, r.currency), money(r.gross, r.currency), state, r.note, r.source))
         paid = sum((sum(v.values()) for v in self.months.values()), Decimal(0))
         scheduled = sum((r.gross for r in rows if r.pay_day > date.today() and not r.review), Decimal(0))
         review = sum((r.gross for r in rows if r.review), Decimal(0))

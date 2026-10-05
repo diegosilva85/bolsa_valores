@@ -242,7 +242,22 @@ Eventos sem data de pagamento/data com/valor original são avisados, não
 inventados. Amortizações nesta aba não alteram o custo da posição e eventos
 manuais de liquidação não são somados novamente, evitando dupla contagem.
 
-Fonte: [brapi — proventos](https://web-next.brapi.dev/blog/api-dividendos-acoes-fiis-brasil-como-consultar-2026).
+Fonte padrão gratuita: histórico XLSX publicado no [RI do Itaú](https://www.itau.com.br/relacoes-com-investidores/informacoes-ao-mercado/dividendos-e-jcp/),
+sem token, para **ITUB3 e ITUB4**. Usa posição acionária Brasil, pagamento Brasil
+e valor bruto original, não ajustado por bonificações/desdobramentos. O ano é
+o do pagamento, não o da competência. A URL de origem aparece nos lançamentos
+e fica salva no Excel. O arquivo é compartilhado entre os dois tickers na mesma
+consulta. Mudança de formato, falha de download ou ano sem cobertura gera aviso,
+não confirmação de zero rendimentos.
+
+**Limitação atual:** a coleta gratuita de FIIs (incluindo BCFF11/BTHF11 e
+BBPO11/TVRI11) e outras ações ainda não está validada/implementada. Esses ativos
+geram aviso de falta de cobertura; dados anteriores são preservados em revisão.
+Não há associação automática de tickers extintos aos sucessores.
+Para anos já salvos, selecione a fonte e use **Gerar novamente** para atualizar;
+apenas trocar a fonte não descarta nem consulta novamente o cache.
+
+Fonte alternativa selecionável: [brapi — proventos](https://web-next.brapi.dev/blog/api-dividendos-acoes-fiis-brasil-como-consultar-2026).
 Em **Acesso brapi**, informe um token válido ou configure `BRAPI_TOKEN` no
 ambiente antes de abrir o aplicativo. O token digitado fica somente na sessão,
 nunca no Excel, em URLs ou no Git. O acesso depende do plano contratado com

@@ -204,7 +204,7 @@ def generate_income(trades, events, year, provider, today=None, cancel=None):
                     note += ' Fonte não verificada ou informa somente prazo de pagamento.'
                 rows.append(Income(id, ticker, position.kind, category, record, pay, unit, position.quantity,
                     (unit * position.quantity).quantize(Decimal('.01'), rounding=ROUND_HALF_UP), 'BRL',
-                    'brapi', note, review))
+                    event.get('source') or 'brapi', note, review))
             except (ValueError, TypeError, KeyError) as exc:
                 warnings.append(f'{ticker}: evento ignorado/requer revisão: {exc}')
     # Amortizações do livro corporativo não são somadas automaticamente:

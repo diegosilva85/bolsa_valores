@@ -424,7 +424,7 @@ class ExcelPortfolio:
         if period['history'] != history_key(self.trades, self.events):
             raise ValueError('Histórico alterado durante a geração de proventos.')
         if not successful and period['warnings']:
-            raise ValueError('Consulta indisponível; dados anteriores preservados. Veja Avisos da consulta e Acesso brapi.')
+            raise ValueError('Consulta indisponível; dados anteriores preservados. Veja Avisos da consulta e a fonte selecionada.')
         year = period['year']
         preserved = [replace(r, review=True, note='Consulta falhou; registro anterior preservado para revisão.')
                      for r in self.income if r.pay_day.year == year and r.ticker not in successful]
