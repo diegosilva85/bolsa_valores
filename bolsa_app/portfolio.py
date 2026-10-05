@@ -9,8 +9,9 @@ import re
 import shutil
 import tempfile
 from uuid import uuid4
+from .catalog import FX_SYMBOLS
 
-CLASSES = ('Ações', 'FIIs', 'ETFs', 'BDRs', 'FIagro', 'FI-Infra', 'Outros', 'Ações EUA', 'ETFs EUA', 'Criptomoedas')
+CLASSES = ('Ações', 'FIIs', 'ETFs', 'BDRs', 'FIagro', 'FI-Infra', 'Outros', 'Ações EUA', 'ETFs EUA', 'Criptomoedas', 'Moedas')
 LEGACY_HEADERS = ('ID', 'Data', 'Ticker', 'Nome', 'Classe', 'Operação', 'Quantidade', 'Preço unitário (R$)')
 HEADERS = (*LEGACY_HEADERS[:7], 'Preço unitário', 'Moeda')
 
@@ -20,6 +21,8 @@ def currency_for(kind):
 
 
 def symbol_for(ticker, kind):
+    if kind == 'Moedas':
+        return FX_SYMBOLS[ticker]
     return ticker if currency_for(kind) == 'USD' else ticker + '.SA'
 
 
@@ -71,7 +74,10 @@ class Trade:
     @classmethod
     def make(cls, day, ticker, name, kind, side, quantity, price, id=None):
         ticker = str(ticker).strip().upper().removesuffix('.SA')
-        if kind == 'Criptomoedas':
+        if kind == 'Moedas':
+            ticker = ticker if ticker.endswith('/BRL') else ticker + '/BRL'
+            valid = ticker in FX_SYMBOLS
+        elif kind == 'Criptomoedas':
             ticker = ticker if ticker.endswith('-USD') else ticker + '-USD'
             valid = re.fullmatch(r'[A-Z0-9]{2,15}-USD', ticker)
         elif kind in ('Ações EUA', 'ETFs EUA'):

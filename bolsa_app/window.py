@@ -52,7 +52,8 @@ class MarketChart(Canvas):
         for index in range(5):
             value = high - price_range * index / 4
             y = top + plot_height * index / 4
-            label = f"{value:,.0f}".replace(",", ".")
+            label = f"{value:,.4f}" if abs(value) < 10 else f"{value:,.2f}" if abs(value) < 1000 else f"{value:,.0f}"
+            label = label.replace(',', 'X').replace('.', ',').replace('X', '.')
             self.create_text(left - 10, y, text=label, fill=MUTED, anchor="e", font=("Sans", 9))
 
         timestamps = self.snapshot.timestamps
@@ -178,13 +179,16 @@ class QuoteCard(Frame):
                 return
             snapshot = self.app.provider.converted(snapshot, self.fx[0])
         self.chart.set_snapshot(snapshot)
-        value = f"{snapshot.last_price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        digits = 6 if self.asset.kind == 'forex' else 2
+        value = f"{snapshot.last_price:,.{digits}f}".replace(",", "X").replace(".", ",").replace("X", ".")
         prefix = 'US$ ' if self.display_currency == 'USD' else 'R$ '
         self.price.config(text=(value + " pts") if self.asset.ticker.startswith("^") else prefix + value)
         self.change.config(text=f"Variação no período: {snapshot.change_percent:+.2f}%".replace(".", ","),
                            fg=GREEN if snapshot.change >= 0 else RED)
         stamp = snapshot.timestamps[-1].strftime("%d/%m/%Y %H:%M")
         self.status.config(text=f"Último dado: {stamp} • Brasília")
+        if self.asset.kind == 'forex':
+            self.status.config(text=f"1 {self.asset.ticker.split('/')[0]} = R$ {value}\nÚltimo dado: {stamp} • Brasília")
         if self.asset.currency == 'USD' and self.display_currency == 'BRL':
             self.status.config(text=f"{stamp} • USD/BRL {self.fx[0]:.4f} ({self.fx[1]:%d/%m})\nSérie convertida pelo mesmo câmbio; não é retorno cambial histórico.")
 
@@ -420,7 +424,7 @@ class MainWindow:
             self.search_dialog.lift()
             return
         dialog = self.search_dialog = Toplevel(self.root)
-        dialog.title("Buscar ativos — B3, EUA e criptomoedas")
+        dialog.title("Buscar ativos — B3, EUA, criptomoedas e câmbio")
         dialog.geometry("720x520")
         self.query = StringVar()
         Label(dialog, text="Digite ao menos 3 caracteres do ticker ou nome").pack(pady=10)
@@ -480,7 +484,7 @@ class MainWindow:
                 self.search_results = result
                 for i, a in enumerate(result):
                     self.matches.insert('', 'end', iid=str(i), values=(a.ticker, a.name, a.kind))
-            self.search_info.set(f'{len(self.search_results)} resultados • B3 / EUA / cripto')
+            self.search_info.set(f'{len(self.search_results)} resultados • B3 / EUA / cripto / câmbio')
         self.submit(done, search_global, query)
 
     def update_search(self):

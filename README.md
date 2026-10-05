@@ -27,6 +27,20 @@ para a aba existente. Cada gráfico possui seu próprio período.
 Na faixa superior, escolha um período e clique em **Aplicar à aba** para atualizar
 todos os gráficos da aba selecionada; as demais abas mantêm seus períodos.
 
+## Câmbio
+
+A busca inclui 20 moedas contra o real: USD, EUR, JPY, CNY, GBP, CHF, CAD,
+AUD, NZD, HKD, SGD, MXN, ARS, CLP, ZAR, INR, KRW, SEK, NOK e DKK.
+Busque pelo código ou nome em português, como `dólar`, `euro`, `iene` ou `yuan`.
+O par `JPY/BRL`, por exemplo, mostra o valor de **1 iene em reais**, com seis
+casas decimais. Cada par aceita os mesmos períodos e pode ser salvo no painel.
+A disponibilidade do histórico depende do Yahoo Finance; indisponibilidades
+aparecem no cartão.
+
+Na carteira, selecione a classe **Moedas**. Quantidade é o número de unidades da
+moeda estrangeira e preço unitário é em BRL (ex.: 100 USD comprados a R$ 5 cada).
+A avaliação usa o par direto contra o real e participa do total normalmente.
+
 ## Criptomoedas e ativos americanos
 
 A busca também consulta o Yahoo Finance por tickers e nomes de ativos americanos

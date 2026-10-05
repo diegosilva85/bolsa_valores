@@ -13,13 +13,14 @@ from .portfolio import CLASSES, ExcelPortfolio, Trade, positions, currency_for, 
 BG, FG, MUTED = '#111827', '#e5e7eb', '#94a3b8'
 CLASS_MAP = {'stock': 'Ações', 'unit': 'Ações', 'fii': 'FIIs', 'etf': 'ETFs',
              'bdr': 'BDRs', 'fi-agro': 'FIagro', 'fi-infra': 'FI-Infra',
-             'crypto': 'Criptomoedas', 'us-stock': 'Ações EUA', 'us-etf': 'ETFs EUA'}
+             'crypto': 'Criptomoedas', 'us-stock': 'Ações EUA', 'us-etf': 'ETFs EUA', 'forex': 'Moedas'}
 
 
 def money(value, currency='BRL'):
     if value is None:
         return '—'
-    return ('US$ ' if currency == 'USD' else 'R$ ') + f'{value:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+    digits = 6 if value != 0 and abs(value) < 1 else 2
+    return ('US$ ' if currency == 'USD' else 'R$ ') + f'{value:,.{digits}f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
 def percent(value, total):
@@ -383,13 +384,16 @@ class PortfolioWindow:
             query = fields['Ticker'].get().strip().upper()
             matches = self.app.catalog.search(query)
             ticker_box['values'] = [a.ticker for a in matches if not a.ticker.startswith('^')]
-            exact = next((a for a in self.app.catalog.assets if a.ticker == query or a.ticker == query + '-USD'), None)
+            exact = next((a for a in self.app.catalog.assets if a.ticker in (query, query + '-USD', query + '/BRL')), None)
             if exact:
                 fields['Nome'].set(exact.name)
                 fields['Classe'].set(CLASS_MAP.get(exact.kind, 'Outros'))
         fields['Ticker'].trace_add('write', suggest)
         price_currency = StringVar()
         def update_currency(*_):
+            if fields['Classe'].get() == 'Moedas':
+                price_currency.set('Quantidade em moeda estrangeira; preço em R$ por unidade. Ex.: 100 USD a R$ 5,00 cada.')
+                return
             price_currency.set('Preço por unidade em ' + ('US$ (dólares)' if currency_for(fields['Classe'].get()) == 'USD' else 'R$ (reais)') + '. Quantidades fracionárias são aceitas.')
         fields['Classe'].trace_add('write', update_currency)
         update_currency()

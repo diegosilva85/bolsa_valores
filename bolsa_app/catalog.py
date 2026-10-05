@@ -20,12 +20,25 @@ class Asset:
 
     @property
     def symbol(self):
+        if self.kind == 'forex':
+            return FX_SYMBOLS[self.ticker]
         if self.currency == 'USD':
             return self.ticker if self.kind != 'crypto' or self.ticker.endswith('-USD') else self.ticker + '-USD'
         return self.ticker if self.ticker.startswith('^') or self.ticker.endswith('.SA') else self.ticker + '.SA'
 
 
 IBOV = Asset('^BVSP', 'Ibovespa', 'Índice')
+FX_NAMES = {
+    'USD': 'Dólar americano', 'EUR': 'Euro', 'JPY': 'Iene japonês',
+    'CNY': 'Yuan chinês (renminbi)', 'GBP': 'Libra esterlina', 'CHF': 'Franco suíço',
+    'CAD': 'Dólar canadense', 'AUD': 'Dólar australiano', 'NZD': 'Dólar neozelandês',
+    'HKD': 'Dólar de Hong Kong', 'SGD': 'Dólar de Singapura', 'MXN': 'Peso mexicano',
+    'ARS': 'Peso argentino', 'CLP': 'Peso chileno', 'ZAR': 'Rand sul-africano',
+    'INR': 'Rúpia indiana', 'KRW': 'Won sul-coreano', 'SEK': 'Coroa sueca',
+    'NOK': 'Coroa norueguesa', 'DKK': 'Coroa dinamarquesa',
+}
+FX_SYMBOLS = {code + '/BRL': ('BRL=X' if code == 'USD' else code + 'BRL=X') for code in FX_NAMES}
+FX_ASSETS = [Asset(code + '/BRL', name + ' · reais por unidade', 'forex') for code, name in FX_NAMES.items()]
 GLOBAL_ASSETS = [Asset('BTC-USD', 'Bitcoin', 'crypto'), Asset('ETH-USD', 'Ethereum', 'crypto'),
                  Asset('AAPL', 'Apple', 'us-stock'), Asset('MSFT', 'Microsoft', 'us-stock'),
                  Asset('NVDA', 'NVIDIA', 'us-stock'), Asset('SPY', 'SPDR S&P 500 ETF', 'us-etf')]
@@ -67,6 +80,7 @@ class Catalog:
         except (OSError, ValueError, TypeError):
             pass
         self.merge(GLOBAL_ASSETS)
+        self.merge(FX_ASSETS)
 
     def merge(self, assets):
         self.assets = list({a.ticker: a for a in [*self.assets, *assets]}.values())
@@ -88,7 +102,7 @@ class Catalog:
                 if len(assets) - 1 < data.get('totalCount', 0):
                     raise RuntimeError('Catálogo incompleto; mantendo a cópia anterior. Tente novamente.')
                 result = sorted(assets.values(), key=lambda a: a.ticker)
-                result += [a for a in self.assets if a.currency == 'USD']
+                result += [a for a in self.assets if a.currency == 'USD' or a.kind == 'forex']
                 save_json(self.path, [asdict(a) for a in result])
                 return result
         raise RuntimeError('Catálogo excedeu o limite de páginas; atualização não aplicada.')
