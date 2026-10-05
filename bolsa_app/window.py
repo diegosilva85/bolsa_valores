@@ -11,6 +11,8 @@ from tkinter import ttk
 
 from .market_data import HISTORY_RANGES, MarketSnapshot, YahooFinanceProvider
 from .catalog import Asset, Catalog, IBOV, DATA_DIR, save_json, search_global
+from .design import RoundedFrame, install_theme
+from .logos import LogoCache, badge, tree_badge
 
 BACKGROUND, CARD, GRID = "#0b1120", "#111827", "#263244"
 TEXT, MUTED, BLUE = "#e5e7eb", "#94a3b8", "#38bdf8"
@@ -90,9 +92,9 @@ class MarketChart(Canvas):
 
 
 
-class QuoteCard(Frame):
+class QuoteCard(RoundedFrame):
     def __init__(self, parent, app, asset, period="Hoje", removable=False, refresh=True):
-        super().__init__(parent, background=CARD, padx=10, pady=8)
+        super().__init__(parent, background=CARD, padx=16, pady=14)
         self.app, self.asset = app, asset
         self.alive, self.loading = True, False
         self.generation = 0
@@ -101,6 +103,7 @@ class QuoteCard(Frame):
         self.fx = None
         head = Frame(self, background=CARD)
         head.pack(fill=X)
+        badge(head, app, asset).pack(side=LEFT, padx=(0, 8))
         if removable:
             self.drag_handle = Label(head, text='⋮⋮', bg=CARD, fg=BLUE, cursor='fleur', font=('Sans', 14))
             self.drag_handle.pack(side=LEFT, padx=(0, 5))
@@ -109,7 +112,7 @@ class QuoteCard(Frame):
               font=("Sans", 12, "bold")).pack(side=LEFT)
         if removable:
             ttk.Button(head, text="×", width=3, command=lambda: app.remove(self)).pack(side=RIGHT)
-            ttk.Button(head, text="Ampliar", command=lambda: app.preview(asset)).pack(side=RIGHT)
+            ttk.Button(head, text="↗", width=3, command=lambda: app.preview(asset)).pack(side=RIGHT)
         Label(self, text=asset.name, bg=CARD, fg=MUTED, anchor="w").pack(fill=X)
         price_row = Frame(self, bg=CARD)
         price_row.pack(fill=X)
@@ -125,11 +128,11 @@ class QuoteCard(Frame):
         controls.pack(fill=X, pady=3)
         self.period = StringVar(value=period)
         selector = ttk.Combobox(controls, textvariable=self.period, values=list(HISTORY_RANGES),
-                               state="readonly", width=18)
+                               state="readonly", width=14)
         selector.pack(side=LEFT)
         selector.bind("<<ComboboxSelected>>", self.period_changed)
         ttk.Button(controls, text="↻", width=3, command=self.refresh).pack(side=RIGHT)
-        ttk.Button(controls, text='Informações', command=lambda: app.show_info(asset)).pack(side=RIGHT, padx=3)
+        ttk.Button(controls, text='ⓘ Dados', command=lambda: app.show_info(asset)).pack(side=RIGHT, padx=3)
         self.chart = MarketChart(self)
         self.chart.configure(width=200, height=150)
         self.chart.pack(fill=BOTH, expand=True)
@@ -240,14 +243,14 @@ class DashboardTab:
 
     def layout(self):
         count = len(self.cards)
-        columns = min(3, max(1, count))
+        columns = min(3, max(1, count), max(1, self.canvas.winfo_width() // 370))
         rows = max(1, math.ceil(count / columns))
         for i in range(3):
-            self.body.columnconfigure(i, weight=1 if i < columns else 0, uniform="cards", minsize=0)
+            self.body.columnconfigure(i, weight=1 if i < columns else 0, uniform="cards" if i < columns else '', minsize=0)
         for i in range(12):
             self.body.rowconfigure(i, weight=1 if i < rows else 0, minsize=0)
         self.canvas.itemconfigure(self.window, width=max(1, self.canvas.winfo_width()),
-                                  height=max(self.canvas.winfo_height(), rows * 330))
+                                  height=max(self.canvas.winfo_height(), rows * 380))
         for i, card in enumerate(self.cards):
             card.grid(row=i // columns, column=i % columns, sticky="nsew", padx=5, pady=5)
 
@@ -255,6 +258,8 @@ class DashboardTab:
 class MainWindow:
     def __init__(self, root: Tk):
         self.root = root
+        install_theme(root)
+        self.logos = LogoCache()
         self.provider = YahooFinanceProvider()
         from .indicators import IndicatorsProvider
         self.indicators = IndicatorsProvider()
@@ -269,13 +274,11 @@ class MainWindow:
         root.geometry("1200x800")
         root.minsize(960, 580)
         root.configure(bg=BACKGROUND)
-        style = ttk.Style(root)
-        style.theme_use("clam")
         header = Frame(root, bg=BACKGROUND, padx=16, pady=12)
         header.pack(fill=X)
-        Label(header, text="BOLSA BRASIL", bg=BACKGROUND, fg=TEXT,
+        Label(header, text="◈ BOLSA BRASIL", bg=BACKGROUND, fg=TEXT,
               font=("Sans", 16, "bold")).pack(side=LEFT)
-        ttk.Button(header, text="+ Acrescentar gráfico/cotação", command=self.search_window).pack(side=RIGHT)
+        ttk.Button(header, text="＋ Adicionar ativo", command=self.search_window).pack(side=RIGHT)
         ttk.Button(header, text="Atualizar", command=self.refresh_all).pack(side=RIGHT, padx=8)
         from .portfolio_ui import choose_portfolio
         ttk.Button(header, text="Criar carteira", command=lambda: choose_portfolio(self, True)).pack(side=RIGHT, padx=4)
@@ -288,6 +291,8 @@ class MainWindow:
                      state="readonly", width=20).pack(side=LEFT, padx=8)
         ttk.Button(period_bar, text="Aplicar à aba", command=self.apply_tab_period).pack(side=LEFT)
         ttk.Button(period_bar, text='+ Nova aba', command=self.new_tab).pack(side=RIGHT)
+        self.logo_button = ttk.Button(period_bar, text='↓ Logos offline', command=self.download_logos)
+        self.logo_button.pack(side=RIGHT, padx=8)
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill=BOTH, expand=True, padx=10)
         root.bind('<B1-Motion>', self.drag_motion, add='+')
@@ -605,6 +610,7 @@ class MainWindow:
                 self.search_results = result
                 for i, a in enumerate(result):
                     self.matches.insert('', 'end', iid=str(i), values=(a.ticker, a.name, a.kind))
+                    tree_badge(self.matches, self, a, str(i))
             self.search_info.set(f'{len(self.search_results)} resultados • B3 / EUA / cripto / câmbio')
         self.submit(done, search_global, query)
 
@@ -613,6 +619,7 @@ class MainWindow:
         self.search_results = self.catalog.search(self.query.get())
         for i, asset in enumerate(self.search_results):
             self.matches.insert("", "end", iid=str(i), values=(asset.ticker, asset.name, asset.kind))
+            tree_badge(self.matches, self, asset, str(i))
         self.search_info.set(
             f"{len(self.search_results)} resultados • {len(self.catalog.assets)} ativos no catálogo"
             if len(self.query.get().strip()) >= 3 else "Sugestões aparecem a partir do terceiro caractere.")
@@ -652,8 +659,17 @@ class MainWindow:
         self.refresh_all()
         self.root.after(60000, self.auto_refresh)
 
+    def download_logos(self):
+        self.logo_button.state(['disabled'])
+        self.footer.set('Baixando logos disponíveis para uso offline…')
+        def done(result, error):
+            self.logo_button.state(['!disabled'])
+            self.footer.set(f'Logos: {result} imagens disponíveis no cache. Reabra os cartões para atualizar.' if not error else str(error))
+        self.submit(done, self.logos.preload, list(self.catalog.assets))
+
     def close(self):
         self.save()
+        self.logos.stop.set()
         self.closed = True
         self.executor.shutdown(wait=False, cancel_futures=True)
         self.root.destroy()

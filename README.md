@@ -204,3 +204,24 @@ exercidas devem ser lançadas como compras. Transferências entre corretoras nã
 alteram esta carteira consolidada e não devem ser lançadas como compras/vendas.
 Arquivos antigos continuam aceitos. Exclusões também revalidam todo o histórico;
 a versão anterior do arquivo fica em `.backup.xlsx`.
+# Tema visual e logos
+
+Interface escura com controles e cartões arredondados, abas destacadas e
+indicadores em cartões responsivos com símbolos e explicações. O painel usa
+até três colunas, reduzindo para duas ou uma em janelas menores. As barras
+mantêm suporte a arraste e roda do mouse.
+
+Instale as dependências atualizadas com `pip install -r requirements.txt`.
+Os logos são baixados ao abrir cartões e guardados em `.bolsa_data/logos`.
+O botão **Logos offline** tenta baixar as imagens de todo o catálogo local,
+sem bloquear a interface. As listas usam imagens já em cache; reabra a busca
+ou carteira após um download em lote. Sem imagem disponível, há identificação
+alternativa. O cache é local e não é enviado ao Git; os logos continuam sendo
+marcas de seus respectivos titulares.
+
+Fontes: [brapi](https://brapi.dev/faq/a-api-fornece-acesso-as-logos-das-empresas-listadas-na-b3)
+para B3, [Financial Modeling Prep](https://site.financialmodelingprep.com/developer/docs)
+para EUA e [Cryptocurrency Icons](https://github.com/spothq/cryptocurrency-icons)
+(CC0) para criptomoedas. A disponibilidade não é garantida para todos os ativos.
+Conversão SVG usa CairoSVG; em sistemas sem Cairo instale a biblioteca do sistema
+(`libcairo2` no Ubuntu/Debian). Falhas de logo não impedem o uso das cotações.

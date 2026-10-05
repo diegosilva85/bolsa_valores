@@ -83,12 +83,19 @@ def formatted(value, fmt):
 
 
 def open_indicators(app, asset):
-    from tkinter import Toplevel, Label, BOTH, X, StringVar
+    from tkinter import Toplevel, Label, Frame, BOTH, X, StringVar
     from tkinter import ttk
+    from .design import BG, SURFACE, FG, MUTED, ACCENT, RoundedFrame, ScrollArea
+    from .logos import badge
     dialog = Toplevel(app.root)
     dialog.title('Informações — ' + asset.ticker)
-    dialog.geometry('1020x600')
-    Label(dialog, text=f'{asset.ticker} · {asset.name}', font=('Sans', 15, 'bold')).pack(pady=12)
+    dialog.geometry('1080x760')
+    dialog.minsize(680, 480)
+    dialog.configure(bg=BG)
+    heading = Frame(dialog, bg=BG)
+    heading.pack(fill=X, padx=20, pady=(20, 8))
+    badge(heading, app, asset, size=48, background=BG).pack(side='left', padx=(0, 12))
+    Label(heading, text=f'{asset.ticker} · {asset.name}', bg=BG, fg=FG, font=('Sans', 17, 'bold')).pack(side='left')
     status = StringVar(value='Consultando indicadores…')
     Label(dialog, textvariable=status, wraplength=950, justify='left').pack(fill=X, padx=14, pady=8)
     tabs = ttk.Notebook(dialog)
@@ -101,17 +108,26 @@ def open_indicators(app, asset):
             return
         status.set(result['note'] + f"\nConsulta: {result['time']:%d/%m/%Y %H:%M} • atualização em cache por até 5 minutos.")
         for group in dict.fromkeys(r[0] for r in result['rows']):
-            frame = ttk.Frame(tabs)
-            tabs.add(frame, text=group)
-            tree = ttk.Treeview(frame, columns=('name','value','note'), show='headings')
-            for key, title, width in [('name','Indicador',230), ('value','Valor',140), ('note','Definição / metodologia',590)]:
-                tree.heading(key,text=title)
-                tree.column(key,width=width, minwidth=80)
-            scroll = ttk.Scrollbar(frame, orient='horizontal', command=tree.xview)
-            scroll.pack(side='bottom',fill=X)
-            tree.configure(xscrollcommand=scroll.set)
-            tree.pack(fill=BOTH,expand=True)
+            area = ScrollArea(tabs)
+            symbols = {'Valuation': '◆', 'Endividamento': '⚖', 'Eficiência': '◴', 'Rentabilidade': '↗'}
+            tabs.add(area, text=symbols[group] + '  ' + group)
+            cards = []
             for category, name, value, fmt, note in result['rows']:
                 if category == group:
-                    tree.insert('', 'end', values=(name, formatted(value,fmt), note))
+                    card = RoundedFrame(area.body, bg=SURFACE, padx=18, pady=16)
+                    Label(card, text=symbols[group] + '  ' + name, bg=SURFACE, fg=MUTED,
+                          font=('Sans', 10, 'bold'), anchor='w', wraplength=260).pack(fill=X)
+                    Label(card, text=formatted(value, fmt), bg=SURFACE, fg=ACCENT if value is not None else MUTED,
+                          font=('Sans', 21, 'bold'), anchor='w').pack(fill=X, pady=(12, 8))
+                    description = Label(card, text=note, bg=SURFACE, fg=MUTED, justify='left', anchor='nw', wraplength=260)
+                    description.pack(fill=X)
+                    cards.append((card, description))
+            def layout(event, area=area, cards=cards):
+                count = max(1, min(3, event.width // 300))
+                for col in range(3):
+                    area.body.columnconfigure(col, weight=1 if col < count else 0, uniform='cards' if col < count else '')
+                for index, (card, description) in enumerate(cards):
+                    card.grid(row=index // count, column=index % count, sticky='nsew', padx=7, pady=7)
+                    description.configure(wraplength=max(180, event.width // count - 54))
+            area.canvas.bind('<Configure>', layout, add='+')
     app.submit(loaded, app.indicators.get, asset)

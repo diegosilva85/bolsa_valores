@@ -69,7 +69,7 @@ class Pie(Canvas):
 
 def table(parent, columns, height=8):
     style = ttk.Style(parent)
-    style.configure('Portfolio.Treeview', background=BG, fieldbackground=BG, foreground=FG, rowheight=24)
+    style.configure('Portfolio.Treeview', background=BG, fieldbackground=BG, foreground=FG, rowheight=34)
     style.configure('Portfolio.Treeview.Heading', background='#25354c', foreground=FG, padding=6)
     style.map('Portfolio.Treeview', background=[('selected', '#31445e')], foreground=[('selected', '#ffffff')])
     frame = Frame(parent, bg=BG)
@@ -305,6 +305,11 @@ class PortfolioWindow:
             tree.insert('', 'end', iid=ticker, values=('● '+ticker, p.kind, str(p.quantity), money(quote, quote_currency), money(values[ticker], self.display_currency),
                                          percent(values[ticker], total), stamp.strftime('%d/%m/%Y %H:%M') if stamp else 'Sem cotação'),
                         tags=(ticker,))
+            if hasattr(self.app, 'logos'):
+                from .logos import tree_badge
+                from .catalog import Asset
+                kind = next((key for key, value in CLASS_MAP.items() if value == p.kind), 'stock')
+                tree_badge(tree, self.app, Asset(ticker, p.name, kind), ticker)
 
     def bind_asset_info(self, tree):
         from tkinter import Menu
