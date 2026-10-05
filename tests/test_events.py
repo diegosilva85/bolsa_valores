@@ -6,6 +6,32 @@ from bolsa_app.portfolio import CorporateEvent, ExcelPortfolio, Trade, positions
 
 
 class EventsTests(unittest.TestCase):
+    def test_liquidation_calculator_uses_historical_adjusted_position(self):
+        from bolsa_app.portfolio import calculate_liquidation
+        split = self.event('Desdobramento', factor=8)
+        future_sale = Trade.make('05/01/2020', 'ABCD3', '', 'Ações', 'Venda', 80, 10)
+        result = calculate_liquidation([self.buy(), future_sale], [split], '03/01/2020',
+            'Antes', 'ABCD3', '0,8', '8,20', '0,56', '2,00', '0')
+        self.assertEqual(result['source_quantity'], 80)
+        self.assertEqual(result['received_quantity'], 64)
+        self.assertEqual(result['received_price'], Decimal('10.25'))
+        self.assertEqual(result['cash'], Decimal('42.80'))
+
+    def test_calculator_fraction_timing_and_invalid_inputs(self):
+        from bolsa_app.portfolio import calculate_liquidation
+        def calc(**kwargs):
+            args = dict(day='01/01/2020', timing='Depois', source='ABCD3', factor='.83',
+                        asset_value_per_old='8.3', cash_per_old='.56', deductions='0', fraction_cash='1.23')
+            args.update(kwargs)
+            return calculate_liquidation([self.buy()], [], **args)
+        result = calc()
+        self.assertEqual(result['fraction'], Decimal('.3'))
+        self.assertEqual(result['cash'], Decimal('6.83'))
+        for kwargs in (dict(timing='Antes'), dict(deductions=100), dict(cash_per_old=''),
+                       dict(cash_per_old='NaN'), dict(fraction_cash=-1), dict(factor=0)):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                calc(**kwargs)
+
     def test_excel_class_correction_reconciles_events(self):
         from openpyxl import load_workbook
         for ticker in ('BCFF11', 'BBPO11'):

@@ -1,7 +1,7 @@
 """Livro de operações em Excel e cálculo de posições, independente da interface."""
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR, ROUND_HALF_UP
 from hashlib import sha256
 from pathlib import Path
 import os
@@ -239,6 +239,42 @@ def positions(trades, events=(), settlements=None, normalized_events=None):
             p.cost -= p.cost / p.quantity * t.quantity
             p.quantity -= t.quantity
     return {key: p for key, p in result.items() if p.quantity > 0}
+
+
+def calculate_liquidation(trades, events, day, timing, source, factor,
+                          asset_value_per_old, cash_per_old, deductions, fraction_cash):
+    """Estimativa com parâmetros explícitos do informe; não apura tributos."""
+    day = trade_date(day)
+    if timing not in ('Antes', 'Depois'):
+        raise ValueError('Momento inválido.')
+    source = str(source).strip().upper().removesuffix('.SA')
+    prior_trades = [t for t in trades if t.day < day or (t.day == day and timing == 'Depois')]
+    prior_events = [e for e in events if e.day < day or
+                    (e.day == day and (timing == 'Depois' or e.timing == 'Antes'))]
+    p = positions(prior_trades, prior_events).get(source)
+    if p is None:
+        raise ValueError(f'{source}: sem posição antes deste evento. Confira data e momento.')
+    def zero_or_positive(value):
+        text = str(value).strip().replace('R$', '').replace(' ', '')
+        if ',' in text:
+            text = text.replace('.', '').replace(',', '.')
+        try:
+            parsed = Decimal(text)
+        except InvalidOperation as exc:
+            raise ValueError('Preencha todos os parâmetros; use 0 quando não houver valor.') from exc
+        if not parsed.is_finite() or parsed < 0:
+            raise ValueError('Valores devem ser finitos e não negativos.')
+        return parsed
+    ratio, asset_value = number(factor), number(asset_value_per_old)
+    cash_unit, retained, fractions = map(zero_or_positive, (cash_per_old, deductions, fraction_cash))
+    theoretical = p.quantity * ratio
+    credited = theoretical.to_integral_value(rounding=ROUND_FLOOR)
+    net = p.quantity * cash_unit - retained + fractions
+    if net < 0:
+        raise ValueError('Descontos excedem o dinheiro disponível.')
+    return dict(source_quantity=p.quantity, received_quantity=credited,
+                received_price=asset_value / ratio, cash=net.quantize(Decimal('.01'), rounding=ROUND_HALF_UP),
+                fraction=theoretical - credited, gross_cash=p.quantity * cash_unit)
 
 
 class ExcelPortfolio:

@@ -146,6 +146,18 @@ mais recente disponível, identificada pela data do último dado, em horário de
 5. Criar alertas de preço e acompanhamento de rentabilidade.
 # Eventos corporativos manuais
 
+No formulário de liquidação, **Calcular liquidação pelos valores por cota…**
+reconstrói a posição na data (incluindo desdobramentos e excluindo operações
+posteriores). Informe o valor entregue em novas cotas por cota antiga, dinheiro
+bruto por cota antiga, retenções totais e dinheiro adicional de frações recebido.
+O custo por cota nova é o valor em cotas dividido pelo fator; o líquido é a
+quantidade antiga × dinheiro por cota − descontos + dinheiro de frações.
+O resultado é uma estimativa conferível: a quantidade sugerida é a parte inteira,
+o líquido é arredondado a centavos, e os campos continuam editáveis conforme o
+extrato. Não há busca automática de parâmetros ou cálculo tributário. Recalcule
+se alterar data, fator ou parâmetros. Apenas os resultados confirmados são
+gravados no evento; os parâmetros auxiliares da calculadora não são persistidos.
+
 Ao corrigir a classe de um ativo na aba Operações do Excel, corrija todos os
 lançamentos desse ticker e use **Recarregar Excel** no app. A classe de origem
 dos eventos acompanha a posição recalculada quando moeda e instrumento não

@@ -86,6 +86,48 @@ class EventsPanel:
                      'A diferença fracionária fica apenas no histórico; dinheiro não entra no total dos ativos. Não calcula impostos. '
                      'Nos demais eventos, deixe os três campos de liquidação zerados.')
         Label(dialog, text=help_text, wraplength=680, justify='left').grid(row=14, column=0, columnspan=2, padx=10, pady=10)
+        def calculator():
+            from .portfolio import calculate_liquidation
+            if fields['type'].get() != 'Liquidação com entrega de cotas':
+                messagebox.showinfo('Calculadora', 'Selecione Liquidação com entrega de cotas.', parent=dialog)
+                return
+            popup = Toplevel(dialog)
+            popup.title('Calcular pelos valores do comunicado')
+            params = {}
+            labels = [('asset_value_per_old', 'Valor entregue em NOVAS COTAS por cota ANTIGA'),
+                      ('cash_per_old', 'Dinheiro bruto por cota ANTIGA'),
+                      ('deductions', 'Retenções e descontos TOTAIS (0 se não houver)'),
+                      ('fraction_cash', 'Dinheiro adicional de frações TOTAL (0 se não recebido)')]
+            for row, (key, label) in enumerate(labels):
+                Label(popup, text=label).grid(row=row, column=0, padx=10, pady=6, sticky='w')
+                params[key] = StringVar()
+                ttk.Entry(popup, textvariable=params[key]).grid(row=row, column=1, padx=10)
+            Label(popup, text='Use os parâmetros do informe. Não busca comunicados nem estima impostos.\n'
+                  'Custo novo = valor em cotas por cota antiga ÷ relação de troca.\n'
+                  'Quantidade creditada estimada: parte inteira da quantidade teórica.\n'
+                  'Confira arredondamentos e o crédito real antes de salvar.', justify='left').grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+            def calculate():
+                try:
+                    store = self.owner.store
+                    result = calculate_liquidation(store.trades, store.events,
+                        **{key: fields[key].get() for key in ('day', 'timing', 'source', 'factor')},
+                        **{key: value.get() for key, value in params.items()})
+                    preview = (f"Posição na data: {result['source_quantity']}\n"
+                               f"Cotas inteiras estimadas: {result['received_quantity']}\n"
+                               f"Diferença fracionária: {result['fraction']}\n"
+                               f"Custo por nova cota: {result['received_price']}\n"
+                               f"Dinheiro bruto: {result['gross_cash']}\n"
+                               f"Dinheiro líquido estimado: {result['cash']}\n\n"
+                               'Aplicar ao formulário? Confira com seu informe/extrato.\n'
+                               'Se alterar data, fator ou parâmetros, calcule novamente.')
+                    if messagebox.askyesno('Resultado estimado', preview, parent=popup):
+                        for key in ('received_quantity', 'received_price', 'cash'):
+                            fields[key].set(str(result[key]))
+                        popup.destroy()
+                except Exception as exc:
+                    messagebox.showerror('Não foi possível calcular', str(exc), parent=popup)
+            ttk.Button(popup, text='Calcular e conferir', command=calculate).grid(row=5, column=0, columnspan=2, pady=10)
+        ttk.Button(dialog, text='Calcular liquidação pelos valores por cota…', command=calculator).grid(row=15, column=0, columnspan=2, pady=4)
         def save():
             try:
                 event = CorporateEvent.make(**{k: v.get() for k, v in fields.items()})
@@ -107,4 +149,4 @@ class EventsPanel:
                 dialog.destroy()
             except Exception as exc:
                 messagebox.showerror('Evento não salvo', str(exc), parent=dialog)
-        ttk.Button(dialog, text='Conferir e salvar no Excel', command=save).grid(row=15, column=0, columnspan=2, pady=12)
+        ttk.Button(dialog, text='Conferir e salvar no Excel', command=save).grid(row=16, column=0, columnspan=2, pady=8)
